@@ -1,0 +1,15 @@
+{
+  "name": "shopee-affiliate-backend",
+  "version": "1.0.0",
+  "description": "Shopee trending scraper for affiliate automation",
+  "main": "server.js",
+  "type": "module",
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.8",
+    "cheerio": "^1.0.0-rc.12"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}
