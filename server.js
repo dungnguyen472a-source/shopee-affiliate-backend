@@ -23,15 +23,32 @@ async function fetchHTML(url) {
 function parseItemsFromHTML(html) {
   const $ = cheerio.load(html);
   const items = [];
-  $("div.shopee-search-item-result__item, div._1NoI8_").slice(0, 12).each((i, el) => {
-    const name = $(el).find("div[data-sqe='name'], .yQmmFK, ._10Wbs-").first().text().trim();
-    const price = $(el).find(".x2i1C2, .vioxXd").first().text().trim();
-    const href = $(el).find("a").attr("href") || "";
-    const link = href ? `https://shopee.vn${href}` : "";
-    if (name && link) items.push({ name, price, link });
+
+  // Shopee 2025: layout mới dùng div.shopee-search-item-result__item-wrapper
+  $("div.shopee-search-item-result__item-wrapper, div.shopee-search-item-result__item").each((i, el) => {
+    const name =
+      $(el).find("div[data-sqe='name']").text().trim() ||
+      $(el).find(".Cve6sh, ._1NoI8_, .zGGwiV").first().text().trim();
+
+    const price =
+      $(el).find(".x2i1C2, .vioxXd, .ZEgDH9").first().text().trim();
+
+    // link sản phẩm nằm trong thẻ a[href*="/product/"] hoặc a.shopee-item-card
+    let href =
+      $(el).find("a[href*='/product/']").attr("href") ||
+      $(el).find("a[href*='/i.']").attr("href") ||
+      $(el).find("a").attr("href") ||
+      "";
+
+    if (!href.startsWith("http")) href = "https://shopee.vn" + href;
+
+    if (name && href) items.push({ name, price, link: href });
   });
+
+  console.log(`✅ Parse được ${items.length} sản phẩm`);
   return items.slice(0, 10);
 }
+
 
 async function getTrendingByKeyword(keyword) {
   const key = `kw:${keyword}`;
