@@ -1,7 +1,5 @@
-// server.js
 import express from "express";
 import axios from "axios";
-import * as cheerio from "cheerio";  // ✅ Sửa dòng này
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -9,72 +7,55 @@ const PORT = process.env.PORT || 3000;
 const cache = new Map();
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 phút
 
-async function fetchHTML(url) {
-  const resp = await axios.get(url, {
-    headers: {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-      "Accept-Language": "vi,en;q=0.9"
-    },
-    timeout: 15000
-  });
-  return resp.data;
-}
+async function fetchShopeeItems(keyword) {
+  const cacheKey = `kw:${keyword}`;
+  const now = Date.now();
 
-function parseItemsFromHTML(html) {
-  const items = [];
-
-  // Tìm đoạn script chứa dữ liệu sản phẩm
-  const match = html.match(/<script id="__NEXT_DATA__"[^>]*>(.*?)<\/script>/);
-  if (!match) {
-    console.warn("⚠️ Không tìm thấy script __NEXT_DATA__ trong HTML");
-    return items;
+  if (cache.has(cacheKey)) {
+    const rec = cache.get(cacheKey);
+    if (now - rec.ts < CACHE_TTL_MS) {
+      console.log(`🌀 Dùng cache cho keyword: ${keyword}`);
+      return rec.items;
+    }
   }
+
+  const url = `https://shopee.vn/api/v4/search/search_items?by=sales&limit=10&order=desc&keyword=${encodeURIComponent(keyword)}&page_type=search`;
 
   try {
-    const json = JSON.parse(match[1]);
-    const list =
-      json?.props?.pageProps?.initialState?.search?.searchResult?.itemModules || [];
+    const response = await axios.get(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Accept": "application/json",
+        "Referer": `https://shopee.vn/search?keyword=${encodeURIComponent(keyword)}`,
+        "x-shopee-language": "vi",
+      },
+      timeout: 15000,
+    });
 
-    for (const it of list.slice(0, 10)) {
-      const name = it?.name || "";
-      const price = it?.price ? (it.price / 100000).toLocaleString("vi-VN") + "₫" : "";
-      const link = `https://shopee.vn/product/${it.shopid}/${it.itemid}`;
-      if (name && link) items.push({ name, price, link });
-    }
+    const items = response.data?.items || [];
+    const results = items.map((it) => ({
+      name: it.item_basic.name,
+      price: `${(it.item_basic.price / 100000).toLocaleString("vi-VN")}₫`,
+      link: `https://shopee.vn/product/${it.item_basic.shopid}/${it.item_basic.itemid}`,
+    }));
+
+    console.log(`✅ FetchShopeeItems: lấy được ${results.length} sản phẩm`);
+    cache.set(cacheKey, { ts: now, items: results });
+    return results;
   } catch (err) {
-    console.error("❌ Lỗi parse JSON:", err);
+    console.error(`❌ Lỗi Shopee API cho keyword ${keyword}:`, err.response?.status);
+    return [];
   }
-
-  console.log(`✅ Parse được ${items.length} sản phẩm`);
-  return items;
-}
-
-
-async function getTrendingByKeyword(keyword) {
-  const key = `kw:${keyword}`;
-  const now = Date.now();
-  if (cache.has(key)) {
-    const rec = cache.get(key);
-    if (now - rec.ts < CACHE_TTL_MS) return rec.items;
-  }
-  const url = `https://shopee.vn/search?keyword=${encodeURIComponent(keyword)}`;
-  const html = await fetchHTML(url);
-  const items = parseItemsFromHTML(html);
-  cache.set(key, { ts: now, items });
-  return items;
 }
 
 app.get("/trending", async (req, res) => {
-  try {
-    const keyword = (req.query.keyword || "đèn ngủ").trim();
-    const items = await getTrendingByKeyword(keyword);
-    res.json({ keyword, count: items.length, items });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: String(err) });
-  }
+  const keyword = (req.query.keyword || "đèn ngủ").trim();
+  const items = await fetchShopeeItems(keyword);
+  res.json({ keyword, count: items.length, items });
 });
 
-app.get("/", (req, res) => res.send("✅ Shopee Affiliate Backend đang hoạt động!"));
+app.get("/", (req, res) => {
+  res.send("✅ Shopee Affiliate Backend đang hoạt động (API JSON)");
+});
 
-app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server đang chạy trên cổng ${PORT}`));
