@@ -1,7 +1,7 @@
 // server.js
 import express from "express";
 import axios from "axios";
-import cheerio from "cheerio";
+import * as cheerio from "cheerio";  // ✅ Sửa dòng này
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -23,7 +23,6 @@ async function fetchHTML(url) {
 function parseItemsFromHTML(html) {
   const $ = cheerio.load(html);
   const items = [];
-  // 2 selector fallback - an toàn hơn khi Shopee thay layout
   $("div.shopee-search-item-result__item, div._1NoI8_").slice(0, 12).each((i, el) => {
     const name = $(el).find("div[data-sqe='name'], .yQmmFK, ._10Wbs-").first().text().trim();
     const price = $(el).find(".x2i1C2, .vioxXd").first().text().trim();
@@ -59,6 +58,6 @@ app.get("/trending", async (req, res) => {
   }
 });
 
-app.get("/", (req, res) => res.send("OK - Shopee Affiliate Backend"));
+app.get("/", (req, res) => res.send("✅ Shopee Affiliate Backend đang hoạt động!"));
 
-app.listen(PORT, () => console.log(`Server listening ${PORT}`));
+app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
