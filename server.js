@@ -21,40 +21,34 @@ async function fetchHTML(url) {
 }
 
 function parseItemsFromHTML(html) {
-  const $ = cheerio.load(html);
   const items = [];
 
-  $("div.shopee-search-item-result__item-wrapper, div.shopee-search-item-result__item").each((i, el) => {
-    // Lấy tên sản phẩm
-    const name =
-      $(el).find("div[data-sqe='name']").text().trim() ||
-      $(el).find(".Cve6sh, .zGGwiV, ._10Wbs-").first().text().trim();
+  // Tìm đoạn script chứa dữ liệu sản phẩm
+  const match = html.match(/<script id="__NEXT_DATA__"[^>]*>(.*?)<\/script>/);
+  if (!match) {
+    console.warn("⚠️ Không tìm thấy script __NEXT_DATA__ trong HTML");
+    return items;
+  }
 
-    // Lấy giá
-    const price =
-      $(el).find(".x2i1C2, .vioxXd, .ZEgDH9").first().text().trim();
+  try {
+    const json = JSON.parse(match[1]);
+    const list =
+      json?.props?.pageProps?.initialState?.search?.searchResult?.itemModules || [];
 
-    // Lấy link sản phẩm
-    let href =
-      $(el).find("a[href*='/product/']").attr("href") ||
-      $(el).find("a[href*='/i.']").attr("href") ||
-      $(el).find("a").attr("href") || "";
-
-    // Nếu href không phải URL đầy đủ thì thêm prefix
-    if (href && !href.startsWith("http")) {
-      href = "https://shopee.vn" + href;
+    for (const it of list.slice(0, 10)) {
+      const name = it?.name || "";
+      const price = it?.price ? (it.price / 100000).toLocaleString("vi-VN") + "₫" : "";
+      const link = `https://shopee.vn/product/${it.shopid}/${it.itemid}`;
+      if (name && link) items.push({ name, price, link });
     }
+  } catch (err) {
+    console.error("❌ Lỗi parse JSON:", err);
+  }
 
-    if (name && href) {
-      items.push({ name, price, link: href });
-    }
-  });
-
-  // debug log (nếu muốn)
-  console.log(`ParseItems: tìm thấy ${items.length} sp`);
-
-  return items.slice(0, 10);
+  console.log(`✅ Parse được ${items.length} sản phẩm`);
+  return items;
 }
+
 
 async function getTrendingByKeyword(keyword) {
   const key = `kw:${keyword}`;
