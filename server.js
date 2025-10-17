@@ -24,31 +24,37 @@ function parseItemsFromHTML(html) {
   const $ = cheerio.load(html);
   const items = [];
 
-  // Shopee 2025: layout mới dùng div.shopee-search-item-result__item-wrapper
   $("div.shopee-search-item-result__item-wrapper, div.shopee-search-item-result__item").each((i, el) => {
+    // Lấy tên sản phẩm
     const name =
       $(el).find("div[data-sqe='name']").text().trim() ||
-      $(el).find(".Cve6sh, ._1NoI8_, .zGGwiV").first().text().trim();
+      $(el).find(".Cve6sh, .zGGwiV, ._10Wbs-").first().text().trim();
 
+    // Lấy giá
     const price =
       $(el).find(".x2i1C2, .vioxXd, .ZEgDH9").first().text().trim();
 
-    // link sản phẩm nằm trong thẻ a[href*="/product/"] hoặc a.shopee-item-card
+    // Lấy link sản phẩm
     let href =
       $(el).find("a[href*='/product/']").attr("href") ||
       $(el).find("a[href*='/i.']").attr("href") ||
-      $(el).find("a").attr("href") ||
-      "";
+      $(el).find("a").attr("href") || "";
 
-    if (!href.startsWith("http")) href = "https://shopee.vn" + href;
+    // Nếu href không phải URL đầy đủ thì thêm prefix
+    if (href && !href.startsWith("http")) {
+      href = "https://shopee.vn" + href;
+    }
 
-    if (name && href) items.push({ name, price, link: href });
+    if (name && href) {
+      items.push({ name, price, link: href });
+    }
   });
 
-  console.log(`✅ Parse được ${items.length} sản phẩm`);
+  // debug log (nếu muốn)
+  console.log(`ParseItems: tìm thấy ${items.length} sp`);
+
   return items.slice(0, 10);
 }
-
 
 async function getTrendingByKeyword(keyword) {
   const key = `kw:${keyword}`;
